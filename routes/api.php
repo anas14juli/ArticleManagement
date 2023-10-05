@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\Route;
 Route::post('signIn', [RegisterController::class, 'signIn']);
 Route::post('signUp', [RegisterController::class, 'signUp']);
 
+//Authentication
 Route::middleware('auth:sanctum')->group(function () {
     Route::resource('Articles', ArticleController::class, [
         'except' => ['edit', 'create']

@@ -64,4 +64,10 @@ class ArticleController extends BaseController
     {
         return $this->MyServices->getCommentsForAnArticle($id);
     }
+
+    public function getPopularArticle(int $articleId)
+    {
+        return $this->MyServices->getPopularArticle($articleId);
+
+    }
 }

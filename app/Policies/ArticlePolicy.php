@@ -11,6 +11,7 @@ class ArticlePolicy
 {
     use HandlesAuthorization;
 
+    //Role-based System
     public function before(User $user)
     {
         if ($user->role === 'Manager') {
@@ -61,4 +62,5 @@ class ArticlePolicy
 
         return Response::deny('You are not authorized to delete this article.');
     }
+    //End of Role-based System:
 }

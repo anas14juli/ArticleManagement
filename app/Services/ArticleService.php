@@ -7,23 +7,30 @@ use App\Http\Requests\StorearticleRequest;
 use App\Http\Requests\UpdatearticleRequest;
 use App\Models\article;
 use App\Models\comment;
+use App\Models\User;
 use App\Repository\Eloquent\ArticleRepository;
 use App\Repository\Eloquent\CommentRepository;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use App\Notifications\NewArticleNotification;
+use Illuminate\Support\Facades\Notification;
+use Illuminate\Contracts\Cache\Repository as Cache;
+
 
 class ArticleService extends BaseController
 {
     private $ArticleRepository;
     private $CommentRepository;
-    public function __construct(ArticleRepository $ArticleRepository, CommentRepository $CommentRepository)
+    private $cache;
+    public function __construct(ArticleRepository $ArticleRepository, CommentRepository $CommentRepository, Cache $cache)
     {
         $this->ArticleRepository = $ArticleRepository;
         $this->CommentRepository = $CommentRepository;
+        $this->cache = $cache;
     }
-
+    //CRUD for Articles
     public function getAllArticles() // Only for the manager to view all articles first and then accept or reject them before publishing
     {
         $user = auth('sanctum')->user();
@@ -47,9 +54,20 @@ class ArticleService extends BaseController
         if (Gate::denies('create', 'App\Models\Article')) {
             return $this->sendError('Something is wrong!', ['error' => 'Something is wrong']);
         }
+        $admins = User::where('role', 'Manager')->get();
         $input = $request->all();
         $input['user_id'] = $user->id;
         $artical = $this->ArticleRepository->create($input);
+
+        //Queue Systems
+        $article = [
+            'id' => 1,
+            'title' => $artical->title,
+            'text' => $artical->text
+        ];
+        Notification::send($admins, new NewArticleNotification($article['title'], $article['text']));
+        //
+
         return $this->sendResponse($artical, 'successfully created');
     }
 
@@ -124,7 +142,9 @@ class ArticleService extends BaseController
 
         return $this->sendError('you have no permission!', ['error' => 'Unauthorised']);
     }
+    //End of CRUD Articles
 
+    //Search
     public function search(Request $request)
     {
         $query = $request->input('query');
@@ -132,7 +152,9 @@ class ArticleService extends BaseController
 
         return $this->sendResponse($articlesSeaechResults, 'these are articles Seaech Results');
     }
+    //End of Search
 
+    //Commenting System
     public function addComment(Request $request, $id)
     {
         $user = auth('sanctum')->user();
@@ -143,10 +165,31 @@ class ArticleService extends BaseController
         $comment = $this->CommentRepository->create($input);
         return $this->sendResponse($comment, 'successfully added a comment');
     }
-
+    
     public function getCommentsForAnArticle($id)
     {
-        $comments = $this->CommentRepository->where('article_id',$id);
+        $comments = $this->CommentRepository->where('article_id', $id);
         return $this->sendResponse($comments, 'These are all comments for this article.');
     }
+    //End OF Commenting System
+
+    //Caching
+    public function getPopularArticle(int $articleId): ?Article
+    {
+        $cacheKey = 'popular_article_' . $articleId;
+
+        if ($this->cache->has($cacheKey)) {
+            $article = $this->cache->get($cacheKey);
+        } else {
+            $article = Article::find($articleId);
+
+            if ($article) {
+                $this->cache->put($cacheKey, $article, 60);
+            }
+        }
+
+        return $article;
+    }
+    //End Of Caching
+
 }
